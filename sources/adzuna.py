@@ -5,15 +5,25 @@ Needs a free app_id + app_key from https://developer.adzuna.com/
 Note: Adzuna has no true "worldwide remote" filter, and where="remote" is
 NOT a real location (confirmed: it silently returns zero results). As a
 practical approximation, we search a handful of major country indexes and
-add "remote" as a search keyword, which reliably surfaces listings
-employers tagged as remote in that market.
+add "remote" as a search keyword to surface likely-remote listings, then
+apply a real filter afterward: only keep results where "remote" actually
+appears (as a whole word) in the title or location, since Adzuna's search
+keyword is a relevance hint, not a guarantee every result matches it.
 """
+
+import re
 
 import requests
 
 BASE_URL = "https://api.adzuna.com/v1/api/jobs/{country}/search/1"
 
-DEFAULT_COUNTRIES = ["us", "gb"]
+DEFAULT_COUNTRIES = ["us", "gb"]  # restricts results to USA + UK postings
+
+_REMOTE_RE = re.compile(r"\bremote\b", re.IGNORECASE)
+
+
+def _is_remote(job):
+    return bool(_REMOTE_RE.search(f"{job['title']} {job['location']} {job.get('description', '')}"))
 
 
 def _search(app_id, app_key, query_text, country, results_per_page=10):
@@ -62,4 +72,4 @@ def fetch(app_id, app_key, queries, countries=None):
             except requests.exceptions.RequestException as e:
                 print(f"[Adzuna] Skipped '{query_text}' in {country} due to error: {e}")
 
-    return results
+    return [job for job in results if _is_remote(job)]

@@ -3,9 +3,20 @@ Job-search agent: pulls jobs from multiple sources, combines them, removes
 duplicates, matches them against your CV, and prints the best fits first.
 
 Sources:
-- Adzuna (mainstream job board, needs app_id/app_key in .env)
-- ReliefWeb (UN/development sector, needs an approved appname in .env)
-- Greenhouse/Lever company pages (not implemented yet, see sources/greenhouse.py)
+- Adzuna (mainstream job board, needs app_id/app_key in .env). Restricted to
+  USA + UK, and to postings that genuinely mention "remote".
+- Remotive (curated remote-job board, no key). Restricted to postings whose
+  published location eligibility includes the USA, UK, or Worldwide.
+- We Work Remotely (well-known remote-job board, no key). Same USA/UK/
+  worldwide restriction, applied to its most recent ~100 postings.
+- ATS company boards -- Greenhouse, Lever, Ashby (no key). Checks the
+  companies in sources/companies.py directly on their own job boards.
+- JobSpy -- LinkedIn, Indeed, ZipRecruiter, Glassdoor (no key, but this one
+  SCRAPES these sites rather than using an official API -- see
+  sources/jobspy_source.py for the ToS/blocking tradeoff this accepts).
+- ReliefWeb (UN/development sector, needs an approved appname in .env). Not
+  restricted to remote/USA/UK -- this one intentionally also covers
+  Pakistan-based roles (see sources/reliefweb.py).
 
 Matching:
 - profile.py builds/loads a structured candidate profile from cv.pdf (once,
@@ -28,7 +39,7 @@ from dotenv import load_dotenv
 import mailer
 import matcher
 import profile as candidate_profile
-from sources import adzuna, greenhouse, reliefweb
+from sources import adzuna, ats, jobspy_source, reliefweb, remotive, weworkremotely
 
 QUERIES = ["project manager", "program manager", "automation", "AI"]
 
@@ -69,9 +80,14 @@ def main():
         appname=os.environ.get("RELIEFWEB_APPNAME"),
         queries=QUERIES,
     )
-    greenhouse_jobs = greenhouse.fetch(companies=[])  # not implemented yet
+    remotive_jobs = remotive.fetch(queries=QUERIES)
+    weworkremotely_jobs = weworkremotely.fetch(queries=QUERIES)
+    ats_jobs = ats.fetch(queries=QUERIES)
+    jobspy_jobs = jobspy_source.fetch(queries=QUERIES)
 
-    all_jobs = combine_and_dedupe(adzuna_jobs, reliefweb_jobs, greenhouse_jobs)
+    all_jobs = combine_and_dedupe(
+        adzuna_jobs, reliefweb_jobs, remotive_jobs, weworkremotely_jobs, ats_jobs, jobspy_jobs
+    )
     print(f"{len(all_jobs)} unique jobs found. Pre-filtering by keyword overlap...")
 
     candidates = matcher.keyword_prefilter(all_jobs, profile)
