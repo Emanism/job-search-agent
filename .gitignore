@@ -1,0 +1,8 @@
+.env
+venv/
+__pycache__/
+*.pyc
+cv.pdf
+profile.json
+.DS_Store
+.claude/settings.local.json
