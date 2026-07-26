@@ -74,12 +74,20 @@ def build_profile(cv_text):
 
 def load_or_build_profile(force_rebuild=False):
     """
-    Return the cached profile from profile.json if it exists; otherwise
-    extract the CV, build a fresh profile via Claude, and cache it.
+    Return the profile, in order of preference:
+    1. The PROFILE_JSON environment variable, if set (used in GitHub Actions,
+       where cv.pdf and profile.json don't exist on the runner).
+    2. The cached profile.json file, if it exists (normal local runs).
+    3. Otherwise, extract cv.pdf and build a fresh profile via Claude.
     """
-    if not force_rebuild and os.path.exists(PROFILE_PATH):
-        with open(PROFILE_PATH) as f:
-            return json.load(f)
+    if not force_rebuild:
+        env_profile = os.environ.get("PROFILE_JSON")
+        if env_profile:
+            return json.loads(env_profile)
+
+        if os.path.exists(PROFILE_PATH):
+            with open(PROFILE_PATH) as f:
+                return json.load(f)
 
     cv_text = extract_cv_text()
     profile = build_profile(cv_text)
